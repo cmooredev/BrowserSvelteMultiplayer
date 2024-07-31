@@ -12,7 +12,14 @@ function createGameState() {
     enemies: {},
     changes: { players: {}, bullets: {}, enemies: {} },
     waveNumber: 0,
+    isGameStarted: false,
   };
+}
+
+function startGame(gameState) {
+  gameState.isGameStarted = true;
+  gameState.waveNumber = 0;
+  spawnEnemyWave(gameState);
 }
 
 //add players to gamestate
@@ -188,6 +195,7 @@ function checkBulletCollisions(gameState) {
 }
 
 function updateGameState(gameState) {
+  if (!gameState.isGameStarted) return;
   //update player positions
   updatePlayerPositions(gameState);
   //update bullet positions
@@ -215,4 +223,5 @@ module.exports = {
   handlePlayerInput,
   updateGameState,
   getChanges,
+  startGame,
 };

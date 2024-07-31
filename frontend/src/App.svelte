@@ -12,6 +12,8 @@
   let sessionId = "";
   let socketId = "";
   let waveNumber = 0;
+  let isGameStarted = false;
+  let isHost = false;
 
   //keep players in the same order across clients
   $: playerEntries = Object.entries(players).sort((a, b) =>
@@ -19,6 +21,7 @@
   );
   $: bulletEntries = Object.entries(bullets);
   $: enemyEntries = Object.entries(enemies);
+  $: isHost = playerEntries.length > 0 && playerEntries[0][0] === socketId;
 
   const updatePlayers = (changes) => {
     players = { ...players, ...changes };
@@ -58,6 +61,11 @@
     if (["ArrowUp", "ArrowDown"].includes(e.key)) emitPlayerInput("stopY");
   };
 
+  const startGame = () => {
+    socket.emit("startGame");
+    isGameStarted = true; // Add this line
+  };
+
   onMount(() => {
     socket.on("sessionId", (id) => {
       sessionId = id;
@@ -67,12 +75,17 @@
       bullets = {};
       enemies = {};
       waveNumber = 0;
+      isGameStarted = false;
 
       socket.on("gameStateUpdate", (changes) => {
         updatePlayers(changes.players);
         updateBullets(changes.bullets);
         updateEnemies(changes.enemies);
         waveNumber = changes.waveNumber;
+      });
+
+      socket.on("gameStarted", () => {
+        isGameStarted = true;
       });
 
       window.addEventListener("keydown", handleKeyDown);
@@ -82,11 +95,13 @@
     return () => {
       if (socket) {
         socket.off("gameStateUpdate");
+        socket.off("gameStarted");
         window.removeEventListener("keydown", handleKeyDown);
         window.removeEventListener("keyup", handleKeyUp);
       }
     };
   });
+  console.log(isGameStarted);
 </script>
 
 <main>
@@ -102,17 +117,24 @@
     {/each}
   </div>
 
-  <div class="game-area">
-    <Background />
-    {#each playerEntries as [id, { x, y, direction }]}
-      <div class="player {direction}" style="left: {x}px; top: {y}px;" />
-    {/each}
-    {#each bulletEntries as [id, { x, y }]}
-      <div class="bullet" style="left: {x}px; top: {y}px;" />
-    {/each}
-    {#each enemyEntries as [id, { x, y }]}
-      <div class="enemy" style="left: {x}px; top: {y}px;" />
-    {/each}
+  <div class="game-container">
+    <div class="game-area">
+      <Background />
+      {#each playerEntries as [id, { x, y, direction }]}
+        <div class="player {direction}" style="left: {x}px; top: {y}px;" />
+      {/each}
+      {#each bulletEntries as [id, { x, y }]}
+        <div class="bullet" style="left: {x}px; top: {y}px;" />
+      {/each}
+      {#each enemyEntries as [id, { x, y }]}
+        <div class="enemy" style="left: {x}px; top: {y}px;" />
+      {/each}
+    </div>
+    {#if !isGameStarted && isHost}
+      <div class="overlay">
+        <button on:click={startGame}>Start Game</button>
+      </div>
+    {/if}
   </div>
 </main>
 
@@ -157,5 +179,31 @@
     width: 20px;
     height: 20px;
     background-color: purple;
+  }
+  .game-container {
+    position: relative;
+  }
+
+  .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  button {
+    margin-bottom: 10px;
+    padding: 10px 20px;
+    font-size: 18px;
+    cursor: pointer;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 5px;
   }
 </style>
