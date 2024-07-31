@@ -1,20 +1,34 @@
-const GAME_WIDTH = 400;
-const GAME_HEIGHT = 400;
+const GAME_WIDTH = 1000;
+const GAME_HEIGHT = 500;
 const PLAYER_SIZE = 20;
 const PLAYER_SPEED = 3;
 const BULLET_SIZE = 5;
 const BULLET_SPEED = 5;
 
-let gameState = { players: {}, bullets: {} };
-let changes = { players: {}, bullets: {} };
-
-//add players to gamestate
-function addPlayer(id) {
-  gameState.players[id] = { x: 0, y: 0, dx: 0, dy: 0, direction: "right" };
-  changes.players[id] = gameState.players[id];
+function createGameState() {
+  return {
+    players: {},
+    bullets: {},
+    enemies: {},
+    changes: { players: {}, bullets: {}, enemies: {} },
+    waveNumber: 0,
+  };
 }
 
-function addBullet(playerId) {
+//add players to gamestate
+function addPlayer(gameState, id) {
+  gameState.players[id] = {
+    x: 0,
+    y: 0,
+    dx: 0,
+    dy: 0,
+    direction: "right",
+    score: 0, //score for new players is set to 0
+  };
+  gameState.changes.players[id] = gameState.players[id];
+}
+
+function addBullet(gameState, playerId) {
   const player = gameState.players[playerId];
   const bulletId = Date.now().toString();
   const directionOffsets = {
@@ -34,16 +48,42 @@ function addBullet(playerId) {
   };
 
   gameState.bullets[bulletId] = bullet;
-  changes.bullets[bulletId] = bullet;
+  gameState.changes.bullets[bulletId] = bullet;
 }
 
-function removePlayer(id) {
+function removePlayer(gameState, id) {
   delete gameState.players[id];
-  changes.players[id] = null;
+  gameState.changes.players[id] = null;
 }
 
-function handlePlayerInput(id, input) {
-  console.log("handling user input", input);
+//add enemy
+function addEnemy(gameState, id) {
+  gameState.enemies[id] = {
+    x: GAME_WIDTH - PLAYER_SIZE, //start at the right side of the screen
+    y: Math.random() * (GAME_HEIGHT - PLAYER_SIZE),
+    dx: -PLAYER_SPEED / 2 + (Math.random() - 0.5),
+    dy: (Math.random() - 0.5) * PLAYER_SPEED,
+  };
+  gameState.changes.enemies[id] = gameState.enemies[id];
+}
+
+//create new wave
+function spawnEnemyWave(gameState) {
+  gameState.waveNumber++;
+  const enemyCount = gameState.waveNumber * 2;
+  for (let i = 0; i < enemyCount; i++) {
+    addEnemy(gameState, `enemy_${Date.now()}_${i}`);
+  }
+}
+
+//check wave
+function checkAndSpawnNewWave(gameState) {
+  if (Object.keys(gameState.enemies).length === 0) {
+    spawnEnemyWave(gameState);
+  }
+}
+
+function handlePlayerInput(gameState, id, input) {
   const player = gameState.players[id];
   if (!player) return;
 
@@ -56,15 +96,14 @@ function handlePlayerInput(id, input) {
     stopY: [player.dx, 0, player.direction],
   };
 
-  if (input === "shoot") addBullet(id);
+  if (input === "shoot") addBullet(gameState, id);
   else if (directions[input]) {
     [player.dx, player.dy, player.direction] = directions[input];
-    changes.players[id] = player;
+    gameState.changes.players[id] = player;
   }
 }
 
-function updateGameState() {
-  //update player positions
+function updatePlayerPositions(gameState) {
   for (let playerId in gameState.players) {
     let player = gameState.players[playerId];
     //check boundaries on x-axis
@@ -77,9 +116,32 @@ function updateGameState() {
       0,
       Math.min(GAME_HEIGHT - PLAYER_SIZE, player.y + player.dy)
     );
-    changes.players[playerId] = player;
+    gameState.changes.players[playerId] = player;
   }
+}
 
+function updateEnemyPositions(gameState) {
+  for (let enemyId in gameState.enemies) {
+    let enemy = gameState.enemies[enemyId];
+    enemy.x += enemy.dx;
+    enemy.y += enemy.dy;
+
+    //keep within game
+    if (enemy.y <= 0 || enemy.y + PLAYER_SIZE >= GAME_HEIGHT) {
+      enemy.dy = -enemy.dy;
+    }
+    enemy.y = Math.max(0, Math.min(GAME_HEIGHT - PLAYER_SIZE, enemy.y));
+
+    if (enemy.x < 0 || enemy.x + PLAYER_SIZE > GAME_WIDTH) {
+      enemy.dx = -enemy.dx;
+    }
+    enemy.x = Math.max(0, Math.min(GAME_WIDTH - PLAYER_SIZE, enemy.x));
+
+    gameState.changes.enemies[enemyId] = enemy;
+  }
+}
+
+function updateBulletPositions(gameState) {
   for (let bulletId in gameState.bullets) {
     let bullet = gameState.bullets[bulletId];
     bullet.x += bullet.dx;
@@ -93,20 +155,61 @@ function updateGameState() {
     ) {
       //if bullet is out of bounds, delete bullet
       delete gameState.bullets[bulletId];
-      changes.bullets[bulletId] = null;
+      gameState.changes.bullets[bulletId] = null;
     } else {
-      changes.bullets[bulletId] = bullet;
+      gameState.changes.bullets[bulletId] = bullet;
     }
   }
 }
 
-function getChanges() {
-  const currentChanges = { ...changes };
-  changes = { players: {}, bullets: {} };
+function checkBulletCollisions(gameState) {
+  for (let bulletId in gameState.bullets) {
+    let bullet = gameState.bullets[bulletId];
+    for (let enemyId in gameState.enemies) {
+      let enemy = gameState.enemies[enemyId];
+      if (
+        bullet.x < enemy.x + PLAYER_SIZE &&
+        bullet.x + BULLET_SIZE > enemy.x &&
+        bullet.y < enemy.y + PLAYER_SIZE &&
+        bullet.y + BULLET_SIZE > enemy.y
+      ) {
+        delete gameState.enemies[enemyId];
+        delete gameState.bullets[bulletId];
+        gameState.changes.enemies[enemyId] = null;
+        gameState.changes.bullets[bulletId] = null;
+        //increment score for player
+        gameState.players[bullet.playerId].score += 100;
+        gameState.changes.players[bullet.playerId] =
+          gameState.players[bullet.playerId];
+        break;
+      }
+    }
+  }
+}
+
+function updateGameState(gameState) {
+  //update player positions
+  updatePlayerPositions(gameState);
+  //update bullet positions
+  updateBulletPositions(gameState);
+  //update enemy positions
+  updateEnemyPositions(gameState);
+  checkBulletCollisions(gameState);
+  //check and spawn wave
+  checkAndSpawnNewWave(gameState);
+}
+
+function getChanges(gameState) {
+  const currentChanges = {
+    ...gameState.changes,
+    waveNumber: gameState.waveNumber,
+  };
+  gameState.changes = { players: {}, bullets: {}, enemies: {} };
   return currentChanges;
 }
 
 module.exports = {
+  createGameState,
   addPlayer,
   removePlayer,
   handlePlayerInput,

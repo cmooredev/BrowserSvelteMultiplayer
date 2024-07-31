@@ -1,13 +1,13 @@
 const { updateGameState, getChanges } = require("./gameState");
 
-function startGameLoop(io) {
+function startGameLoop(io, roomId, gameState) {
   setInterval(() => {
     //update game state
-    updateGameState();
+    updateGameState(gameState);
     //get changes
-    const changes = getChanges();
+    const changes = getChanges(gameState);
     //emit changes
-    io.emit("gameStateUpdate", changes);
+    io.to(roomId).emit("gameStateUpdate", changes);
   }, 1000 / 60);
 }
 
