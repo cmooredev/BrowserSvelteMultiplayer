@@ -14,10 +14,16 @@ clearSessions();
 
 io.on("connection", (socket) => {
   findOrCreateSession(socket, io);
+
+  // Update the ping event listener
+  socket.on("ping", () => {
+    socket.emit("pong");
+  });
 });
 
 const PORT = 3000;
-server.listen(PORT, () => {
-  console.log(`server listening on ${PORT}`);
+const HOST = "0.0.0.0";
+server.listen(PORT, HOST, () => {
+  console.log(`server listening on ${HOST}:${PORT}`);
   //start game loop
 });

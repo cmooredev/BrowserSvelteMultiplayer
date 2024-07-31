@@ -4,7 +4,11 @@ function startGameLoop(io, roomId, gameState) {
   const intervalId = setInterval(() => {
     updateGameState(gameState);
     const changes = getChanges(gameState);
-    io.to(roomId).emit("gameStateUpdate", changes);
+    if (gameState.isGameOver) {
+      io.to(roomId).emit("gameOver");
+    } else {
+      io.to(roomId).emit("gameStateUpdate", changes);
+    }
   }, 1000 / 60);
 
   return () => clearInterval(intervalId);

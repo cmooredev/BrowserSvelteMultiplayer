@@ -1,17 +1,14 @@
 const { startGameLoop } = require("./gameLoop");
-const {
-  createGameState,
-  addPlayer,
-  removePlayer,
-  handlePlayerInput,
-  startGame,
-} = require("./gameState");
+const { createGameState, startGame, resetGame } = require("./gameState");
+const { addPlayer, removePlayer, handlePlayerInput } = require("./players");
 
 const sessions = {};
 
 function findOrCreateSession(socket, io) {
   let sessionId = Object.keys(sessions).find(
-    (id) => Object.keys(sessions[id].players).length === 1
+    (id) =>
+      !sessions[id].gameState.isGameStarted &&
+      Object.keys(sessions[id].players).length === 1
   );
 
   if (!sessionId) {
@@ -21,10 +18,17 @@ function findOrCreateSession(socket, io) {
       io: io.of(`/${sessionId}`),
       gameState: createGameState(),
       gameLoopStop: null,
+      host: socket.id, // Set the host to the first player
     };
   }
 
   const session = sessions[sessionId];
+
+  if (session.gameState.isGameStarted) {
+    socket.emit("gameInProgress");
+    return null;
+  }
+
   session.players[socket.id] = socket;
   addPlayer(session.gameState, socket.id);
 
@@ -32,14 +36,14 @@ function findOrCreateSession(socket, io) {
     session.gameLoopStop = startGameLoop(io, sessionId, session.gameState);
   }
 
-  socket.emit("sessionId", sessionId);
+  socket.emit("sessionId", { sessionId, isHost: session.host === socket.id });
   socket.join(sessionId);
 
-  setUpSocketListeners(socket, sessionId);
+  setUpSocketListeners(io, socket, sessionId);
   return sessionId;
 }
 
-function setUpSocketListeners(socket, sessionId) {
+function setUpSocketListeners(io, socket, sessionId) {
   socket.on("disconnect", () => {
     handleDisconnect(socket.id, sessionId);
   });
@@ -48,9 +52,16 @@ function setUpSocketListeners(socket, sessionId) {
   });
   socket.on("startGame", () => {
     const session = sessions[sessionId];
-    if (session && !session.gameState.isGameStarted) {
+    if (session) {
+      if (session.gameState.isGameOver) {
+        resetGame(session.gameState);
+        for (const playerId in session.players) {
+          addPlayer(session.gameState, playerId);
+        }
+        console.log("added player id", socket.id);
+      }
       startGame(session.gameState);
-      session.io.to(sessionId).emit("gameStarted");
+      io.to(sessionId).emit("gameStarted");
     }
   });
 }
@@ -67,6 +78,10 @@ function handleDisconnect(socketId, sessionId) {
       session.gameLoopStop();
     }
     delete sessions[sessionId];
+  } else if (session.host === socketId) {
+    // If the host disconnected, assign a new host
+    session.host = Object.keys(session.players)[0];
+    session.gameState.host = session.host;
   }
 }
 
