@@ -58,10 +58,11 @@ function setUpSocketListeners(io, socket, sessionId) {
         for (const playerId in session.players) {
           addPlayer(session.gameState, playerId);
         }
-        console.log("added player id", socket.id);
       }
       startGame(session.gameState);
       io.to(sessionId).emit("gameStarted");
+    } else {
+      console.log("Session not found:", sessionId);
     }
   });
 }
