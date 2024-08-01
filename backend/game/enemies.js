@@ -7,6 +7,7 @@ const {
   BOSS_SIZE,
   BOSS_HEALTH,
 } = require("./constants");
+const { reviveDeadPlayers } = require("./players");
 
 function addEnemy(gameState, id) {
   gameState.enemies[id] = {
@@ -78,6 +79,7 @@ function fireEnemyBeam(gameState, enemy) {
 }
 
 function spawnBoss(gameState) {
+  gameState.waveNumber++;
   const bossId = `boss_${Date.now()}`;
   gameState.boss = {
     id: bossId,
@@ -120,8 +122,30 @@ function fireBossWave(gameState) {
   }
 }
 
+function handleEnemies(gameState) {
+  updateEnemyPositions(gameState);
+  checkAndFireEnemyBeam(gameState);
+  checkAndSpawnNewWave(gameState);
+  if (gameState.boss) {
+    updateBossPosition(gameState);
+    fireBossWave(gameState);
+  }
+}
+
+function checkAndSpawnNewWave(gameState) {
+  if (Object.keys(gameState.enemies).length === 0 && !gameState.boss) {
+    if ((gameState.waveNumber + 1) % 2 === 0) {
+      spawnBoss(gameState);
+    } else {
+      spawnEnemyWave(gameState);
+    }
+    reviveDeadPlayers(gameState);
+  }
+}
+
 module.exports = {
   addEnemy,
+  handleEnemies,
   spawnEnemyWave,
   updateEnemyPositions,
   checkAndFireEnemyBeam,

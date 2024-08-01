@@ -1,13 +1,6 @@
-const { GAME_WIDTH, GAME_HEIGHT } = require("./constants");
+const { GAME_WIDTH, GAME_HEIGHT, MAX_POWERUPS } = require("./constants");
 const { addPlayer, updatePlayerPositions } = require("./players");
-const {
-  updateEnemyPositions,
-  spawnEnemyWave,
-  checkAndFireEnemyBeam,
-  spawnBoss,
-  updateBossPosition,
-  fireBossWave,
-} = require("./enemies");
+const { handleEnemies } = require("./enemies");
 const { updateBulletPositions } = require("./bullets");
 const { checkAndSpawnPowerUp, updatePowerUps } = require("./powerups");
 const { checkCollisions } = require("./collisions");
@@ -52,34 +45,17 @@ function resetGame(gameState) {
 function startGame(gameState) {
   gameState.isGameStarted = true;
   gameState.waveNumber = 0;
-  spawnEnemyWave(gameState);
 }
 
 function updateGameState(gameState) {
   if (!gameState.isGameStarted || gameState.isGameOver) return;
   updatePlayerPositions(gameState);
   updateBulletPositions(gameState);
-  updateEnemyPositions(gameState);
+  handleEnemies(gameState);
   checkCollisions(gameState);
   updatePowerUps(gameState);
-  checkAndFireEnemyBeam(gameState);
-  checkAndSpawnPowerUp(gameState);
-  checkAndSpawnNewWave(gameState);
-  if (gameState.boss) {
-    updateBossPosition(gameState);
-    fireBossWave(gameState);
-  }
-}
-
-function checkAndSpawnNewWave(gameState) {
-  if (Object.keys(gameState.enemies).length === 0 && !gameState.boss) {
-    gameState.waveNumber++;
-    if (gameState.waveNumber % 3 === 0) {
-      spawnBoss(gameState);
-    } else {
-      spawnEnemyWave(gameState);
-    }
-    reviveDeadPlayers(gameState);
+  if (Object.keys(gameState.powerups).length < MAX_POWERUPS) {
+    checkAndSpawnPowerUp(gameState);
   }
 }
 

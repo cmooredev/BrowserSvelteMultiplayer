@@ -47,20 +47,26 @@ function checkBulletCollisions(gameState) {
       let bullet = gameState.bullets[bulletId];
       if (
         !bullet.isBossBullet &&
-        isColliding(bullet, gameState.boss, BOSS_SIZE, BULLET_SIZE)
+        bullet.x < gameState.boss.x + BOSS_SIZE &&
+        bullet.x + BULLET_SIZE > gameState.boss.x &&
+        bullet.y < gameState.boss.y + BOSS_SIZE &&
+        bullet.y + BULLET_SIZE > gameState.boss.y
       ) {
         gameState.boss.health -= 10;
         delete gameState.bullets[bulletId];
         gameState.changes.bullets[bulletId] = null;
-        gameState.changes.boss = gameState.boss;
+        gameState.changes.boss = { ...gameState.boss };
 
         if (gameState.boss.health <= 0) {
-          delete gameState.boss;
+          gameState.boss = null; // Change this line
           gameState.changes.boss = null;
           // Award points to all players
           for (let playerId in gameState.players) {
+            console.log("Boss killed", playerId);
             gameState.players[playerId].score += 1000;
-            gameState.changes.players[playerId] = gameState.players[playerId];
+            gameState.changes.players[playerId] = {
+              ...gameState.players[playerId],
+            };
           }
         }
         break;
@@ -106,13 +112,15 @@ function checkPlayerBossCollision(gameState) {
 }
 
 function checkPlayerEnemyCollisions(gameState) {
+  let gameOver = true;
   for (let playerId in gameState.players) {
     const player = gameState.players[playerId];
-    if (player.isDead) continue; // Skip dead players
+    if (player.isDead) continue;
 
+    gameOver = false; // At least one player is alive
     for (let enemyId in gameState.enemies) {
       const enemy = gameState.enemies[enemyId];
-      if (isColliding(player, enemy, PLAYER_SIZE)) {
+      if (isColliding(player, enemy, PLAYER_SIZE, PLAYER_SIZE)) {
         if (!player.shield) {
           player.isDead = true;
           gameState.changes.players[playerId] = player;
@@ -123,7 +131,7 @@ function checkPlayerEnemyCollisions(gameState) {
       }
     }
   }
-  return false;
+  return gameOver;
 }
 
 function checkBeamCollisions(gameState) {
@@ -153,10 +161,10 @@ function checkBeamCollisions(gameState) {
 
 function isColliding(obj1, obj2, size1, size2) {
   return (
-    obj1.x < obj2.x + size1 &&
-    obj1.x + size2 > obj2.x &&
-    obj1.y < obj2.y + size1 &&
-    obj1.y + size2 > obj2.y
+    obj1.x < obj2.x + size2 &&
+    obj1.x + size1 > obj2.x &&
+    obj1.y < obj2.y + size2 &&
+    obj1.y + size1 > obj2.y
   );
 }
 

@@ -79,9 +79,18 @@ function updatePlayerPositions(gameState) {
   gameState.isGameOver = allPlayersDead;
 }
 
+function reviveDeadPlayers(gameState) {
+  for (let playerId in gameState.players) {
+    if (gameState.players[playerId].isDead) {
+      addPlayer(gameState, playerId, gameState.players[playerId].isHost);
+    }
+  }
+}
+
 module.exports = {
   addPlayer,
   removePlayer,
   handlePlayerInput,
   updatePlayerPositions,
+  reviveDeadPlayers,
 };

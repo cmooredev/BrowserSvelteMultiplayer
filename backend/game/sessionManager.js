@@ -43,6 +43,7 @@ function findOrCreateSession(socket, io) {
 
 function setUpSocketListeners(io, socket, sessionId) {
   socket.on("disconnect", () => {
+    console.log("Disconnecting from session:", sessionId);
     handleDisconnect(socket.id, sessionId);
   });
   socket.on("playerInput", (input) => {
@@ -88,6 +89,7 @@ function clearSessions() {
   Object.keys(sessions).forEach((key) => {
     if (sessions[key].gameLoopStop) {
       sessions[key].gameLoopStop();
+      console.log("Cleared session", key);
     }
     delete sessions[key];
   });

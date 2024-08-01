@@ -5,6 +5,8 @@ const {
   POWERUP_DURATION,
   POWERUP_SPAWN_INTERVAL,
   PLAYER_SIZE,
+  MAX_POWERUPS,
+  POWERUP_LIFETIME,
 } = require("./constants");
 
 const PowerUpType = {
@@ -13,6 +15,8 @@ const PowerUpType = {
 };
 
 function createPowerUp(gameState) {
+  if (Object.keys(gameState.powerups).length >= MAX_POWERUPS) return;
+
   const id = `powerup_${Date.now()}`;
   const type =
     Math.random() < 0.5 ? PowerUpType.RADIAL_BLAST : PowerUpType.SHIELD;
@@ -22,6 +26,7 @@ function createPowerUp(gameState) {
     type,
     x: Math.random() * (GAME_WIDTH - POWERUP_SIZE),
     y: Math.random() * (GAME_HEIGHT - POWERUP_SIZE),
+    createdAt: Date.now(),
   };
 
   gameState.powerups[id] = powerup;
@@ -45,15 +50,26 @@ function applyPowerUp(gameState, playerId, powerupId) {
 }
 
 function updatePowerUps(gameState) {
+  const now = Date.now();
+
   for (let playerId in gameState.players) {
     const player = gameState.players[playerId];
-    if (player.shield && Date.now() > player.shieldEndTime) {
+    if (player.shield && now > player.shieldEndTime) {
       player.shield = false;
       gameState.changes.players[playerId] = player;
     }
-    if (player.radialBlast && Date.now() > player.radialBlastEndTime) {
+    if (player.radialBlast && now > player.radialBlastEndTime) {
       player.radialBlast = false;
       gameState.changes.players[playerId] = player;
+    }
+  }
+
+  // Remove expired powerups
+  for (let powerupId in gameState.powerups) {
+    const powerup = gameState.powerups[powerupId];
+    if (now - powerup.createdAt > POWERUP_LIFETIME) {
+      delete gameState.powerups[powerupId];
+      gameState.changes.powerups[powerupId] = null;
     }
   }
 }
