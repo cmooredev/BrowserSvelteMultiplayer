@@ -81,9 +81,10 @@ describe("Latency and Connection Tests", () => {
     expect(Object.keys(session.players).length).toBeGreaterThan(0);
   });
   it("handles multiple connections and measures latency under load", async () => {
-    const numClients = 50;
+    const numClients = 500;
     const clients = [];
     const latencies = [];
+    const sessionIds = new Set();
 
     // Create multiple client connections
     for (let i = 0; i < numClients; i++) {
@@ -91,7 +92,14 @@ describe("Latency and Connection Tests", () => {
         transports: ["websocket"],
         "force new connection": true,
       });
-      await new Promise((resolve) => client.on("connect", resolve));
+      await new Promise((resolve) => {
+        client.on("connect", () => {
+          client.on("sessionId", ({ sessionId }) => {
+            sessionIds.add(sessionId);
+            resolve();
+          });
+        });
+      });
       clients.push(client);
     }
 
@@ -115,8 +123,10 @@ describe("Latency and Connection Tests", () => {
     console.log(`Average latency under load: ${avgLatency}ms`);
     console.log(`Max latency: ${Math.max(...latencies)}ms`);
     console.log(`Min latency: ${Math.min(...latencies)}ms`);
+    console.log(`Unique sessions created: ${sessionIds.size}`);
 
-    expect(avgLatency).toBeLessThan(1000); // Adjust threshold as needed
+    expect(avgLatency).toBeLessThan(1000);
+    expect(sessionIds.size).toBe(numClients / 2 + 1);
 
     // Clean up clients
     clients.forEach((client) => client.disconnect());

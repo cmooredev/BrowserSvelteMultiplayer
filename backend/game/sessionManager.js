@@ -1,6 +1,7 @@
 const { startGameLoop } = require("./gameLoop");
 const { createGameState, startGame, resetGame } = require("./gameState");
 const { addPlayer, removePlayer, handlePlayerInput } = require("./players");
+const { v4: uuidv4 } = require("uuid");
 
 const sessions = {};
 
@@ -8,27 +9,22 @@ function findOrCreateSession(socket, io) {
   let sessionId = Object.keys(sessions).find(
     (id) =>
       !sessions[id].gameState.isGameStarted &&
-      Object.keys(sessions[id].players).length === 1
+      Object.keys(sessions[id].players).length < 2
   );
 
   if (!sessionId) {
-    sessionId = Date.now().toString();
+    sessionId = uuidv4();
+    console.log("Creating session:", sessionId);
     sessions[sessionId] = {
       players: {},
       io: io.of(`/${sessionId}`),
       gameState: createGameState(),
       gameLoopStop: null,
-      host: socket.id, // Set the host to the first player
+      host: socket.id,
     };
   }
 
   const session = sessions[sessionId];
-
-  if (session.gameState.isGameStarted) {
-    socket.emit("gameInProgress");
-    return null;
-  }
-
   session.players[socket.id] = socket;
   addPlayer(session.gameState, socket.id);
 
@@ -36,7 +32,9 @@ function findOrCreateSession(socket, io) {
     session.gameLoopStop = startGameLoop(io, sessionId, session.gameState);
   }
 
-  socket.emit("sessionId", { sessionId, isHost: session.host === socket.id });
+  const isHost = session.host === socket.id;
+  socket.emit("sessionId", { sessionId, isHost });
+  console.log("Joining session:", sessionId);
   socket.join(sessionId);
 
   setUpSocketListeners(io, socket, sessionId);
