@@ -40,8 +40,9 @@ function findOrCreateSession(socket, io) {
   }
 
   const isHost = session.host === socket.id;
+  const sessionHost = session.host;
   const playerIds = Object.keys(session.players);
-  socket.emit("sessionId", { sessionId, isHost, playerIds });
+  socket.emit("sessionId", { sessionId, isHost, playerIds, sessionHost });
   socket.join(sessionId);
 
   setUpSocketListeners(io, socket, sessionId);
@@ -51,7 +52,7 @@ function findOrCreateSession(socket, io) {
 
 function setUpSocketListeners(io, socket, sessionId) {
   socket.on("disconnect", () => {
-    handleDisconnect(socket.id);
+    handleDisconnect(io, socket.id);
   });
   socket.on("playerInput", (input) => {
     const session = sessions[sessionId];
@@ -78,7 +79,7 @@ function setUpSocketListeners(io, socket, sessionId) {
   });
 }
 
-function handleDisconnect(socketId) {
+function handleDisconnect(io, socketId) {
   const sessionId = playerSessions[socketId];
   if (!sessionId) return;
 
@@ -95,9 +96,11 @@ function handleDisconnect(socketId) {
     }
     delete sessions[sessionId];
   } else if (session.host === socketId) {
+    console.log("Player was host. Finding new host...");
     session.host = Object.keys(session.players)[0];
     session.gameState.host = session.host;
-    session.io.to(sessionId).emit("newHost", session.host);
+    io.to(sessionId).emit("newHost", session.host);
+    console.log("Emitting new host id", session.host);
   }
 
   session.lastActivity = Date.now();

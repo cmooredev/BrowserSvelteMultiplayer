@@ -3,7 +3,7 @@
   import { onMount, onDestroy } from "svelte";
   import io from "socket.io-client";
 
-  const SOCKET_URL = "http://10.0.0.9:3000";
+  const SOCKET_URL = "http://localhost:3000";
   const socket = io(SOCKET_URL);
 
   let players = {};
@@ -115,17 +115,22 @@
   onMount(() => {
     socket.on(
       "sessionId",
-      ({ sessionId: id, isHost: host, playerIds: players }) => {
+      ({ sessionId: id, isHost: host, playerIds: players, sessionHost }) => {
         clearGameState();
         sessionId = id;
         socketId = socket.id;
         hostSocketId = host ? socket.id : "";
         console.log(
-          `Connected to session ${sessionId} as socket ${socketId}. Is host: ${isHost}`
+          `Connected to session ${sessionId} as socket ${socketId}. Is host: ${isHost}. session.host: ${sessionHost}`
         );
         console.log("players", players);
         clearGameState();
         isGameStarted = false;
+
+        socket.on("newHost", (host) => {
+          console.log("Host left. You are now the host.")
+          hostSocketId = host;
+        })
 
         socket.on("gameStateUpdate", (changes) => {
           updatePlayers(changes.players);
