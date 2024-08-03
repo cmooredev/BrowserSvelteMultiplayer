@@ -32,6 +32,7 @@
   function updatePing() {
     const start = Date.now();
     socket.emit("ping", () => {
+      console.log("ping");
       ping = Date.now() - start;
     });
   }
@@ -44,7 +45,7 @@
   }
 
   const updatePlayers = (changes) => {
-    players = { ...players, ...changes };
+    players = { ...changes };
     Object.keys(changes).forEach(
       (id) => changes[id] == null && delete players[id]
     );
@@ -112,57 +113,60 @@
   };
 
   onMount(() => {
-    socket.on("sessionId", ({ sessionId: id, isHost: host }) => {
-      clearGameState();
-      sessionId = id;
-      socketId = socket.id;
-      hostSocketId = host ? socket.id : "";
-      console.log(
-        `Connected to session ${sessionId} as socket ${socketId}. Is host: ${isHost}`
-      );
-      clearGameState();
-      isGameStarted = false;
+    socket.on(
+      "sessionId",
+      ({ sessionId: id, isHost: host, playerIds: players }) => {
+        clearGameState();
+        sessionId = id;
+        socketId = socket.id;
+        hostSocketId = host ? socket.id : "";
+        console.log(
+          `Connected to session ${sessionId} as socket ${socketId}. Is host: ${isHost}`
+        );
+        console.log("players", players);
+        clearGameState();
+        isGameStarted = false;
 
-      socket.on("gameStateUpdate", (changes) => {
-        updatePlayers(changes.players);
-        console.log(changes.players);
-        updateBeams(changes.beams);
-        updateBullets(changes.bullets);
-        updateEnemies(changes.enemies);
-        updatePowerups(changes.powerups);
-        waveNumber = changes.waveNumber;
-        if (changes.boss) {
-          boss = changes.boss;
-          if (boss && !bossMaxHealth) {
-            bossMaxHealth = boss.health; // Set max health when boss first appears
+        socket.on("gameStateUpdate", (changes) => {
+          updatePlayers(changes.players);
+          updateBeams(changes.beams);
+          updateBullets(changes.bullets);
+          updateEnemies(changes.enemies);
+          updatePowerups(changes.powerups);
+          waveNumber = changes.waveNumber;
+          if (changes.boss) {
+            boss = changes.boss;
+            if (boss && !bossMaxHealth) {
+              bossMaxHealth = boss.health; // Set max health when boss first appears
+            }
+          } else {
+            boss = null;
+            bossMaxHealth = 1000; // Reset max health when boss is defeated
           }
-        } else {
-          boss = null;
-          bossMaxHealth = 1000; // Reset max health when boss is defeated
-        }
-        if (Object.keys(players).length === 0 && isGameStarted) {
+          if (Object.keys(players).length === 0 && isGameStarted) {
+            isGameOver = true;
+            isGameStarted = false;
+          }
+        });
+
+        socket.on("gameStarted", () => {
+          console.log("gameStarted");
+          clearGameState();
+          isGameStarted = true;
+          isGameOver = false;
+        });
+
+        socket.on("gameOver", () => {
           isGameOver = true;
           isGameStarted = false;
-        }
-      });
+        });
 
-      socket.on("gameStarted", () => {
-        console.log("gameStarted");
-        clearGameState();
-        isGameStarted = true;
-        isGameOver = false;
-      });
+        window.addEventListener("keydown", handleKeyDown);
+        window.addEventListener("keyup", handleKeyUp);
+      }
+    );
 
-      socket.on("gameOver", () => {
-        isGameOver = true;
-        isGameStarted = false;
-      });
-
-      window.addEventListener("keydown", handleKeyDown);
-      window.addEventListener("keyup", handleKeyUp);
-    });
-
-    pingInterval = setInterval(updatePing, 5000); // Update ping every 5 seconds
+    pingInterval = setInterval(updatePing, 1000); // Update ping every 5 seconds
 
     return () => {
       if (socket) {

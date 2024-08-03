@@ -2,10 +2,16 @@ const { startGameLoop } = require("./gameLoop");
 const { createGameState, startGame, resetGame } = require("./gameState");
 const { addPlayer, removePlayer, handlePlayerInput } = require("./players");
 const { v4: uuidv4 } = require("uuid");
+const { PLAYER_SPEED, BULLET_COOLDOWN } = require("./constants");
 
 const sessions = {};
+const playerSessions = {};
+
+const SESSION_CLEANUP_INTERVAL = 60000; // 1 minute
 
 function findOrCreateSession(socket, io) {
+  cleanupStaleSessions();
+
   let sessionId = Object.keys(sessions).find(
     (id) =>
       !sessions[id].gameState.isGameStarted &&
@@ -14,18 +20,19 @@ function findOrCreateSession(socket, io) {
 
   if (!sessionId) {
     sessionId = uuidv4();
-    console.log("Creating session:", sessionId);
     sessions[sessionId] = {
       players: {},
       io: io.of(`/${sessionId}`),
       gameState: createGameState(),
       gameLoopStop: null,
       host: socket.id,
+      lastActivity: Date.now(),
     };
   }
 
   const session = sessions[sessionId];
   session.players[socket.id] = socket;
+  playerSessions[socket.id] = sessionId;
   addPlayer(session.gameState, socket.id);
 
   if (!session.gameLoopStop) {
@@ -33,25 +40,31 @@ function findOrCreateSession(socket, io) {
   }
 
   const isHost = session.host === socket.id;
-  socket.emit("sessionId", { sessionId, isHost });
-  console.log("Joining session:", sessionId);
+  const playerIds = Object.keys(session.players);
+  socket.emit("sessionId", { sessionId, isHost, playerIds });
   socket.join(sessionId);
 
   setUpSocketListeners(io, socket, sessionId);
+  session.lastActivity = Date.now();
   return sessionId;
 }
 
 function setUpSocketListeners(io, socket, sessionId) {
   socket.on("disconnect", () => {
-    console.log("Disconnecting from session:", sessionId);
-    handleDisconnect(socket.id, sessionId);
+    handleDisconnect(socket.id);
   });
   socket.on("playerInput", (input) => {
-    handlePlayerInput(sessions[sessionId].gameState, socket.id, input);
+    const session = sessions[sessionId];
+    if (!session) return;
+
+    const currentTime = Date.now();
+
+    handlePlayerInput(session.gameState, socket.id, input);
+    session.lastActivity = currentTime;
   });
   socket.on("startGame", () => {
     const session = sessions[sessionId];
-    if (session) {
+    if (session && socket.id === session.host) {
       if (session.gameState.isGameOver) {
         resetGame(session.gameState);
         for (const playerId in session.players) {
@@ -60,18 +73,21 @@ function setUpSocketListeners(io, socket, sessionId) {
       }
       startGame(session.gameState);
       io.to(sessionId).emit("gameStarted");
-    } else {
-      console.log("Session not found:", sessionId);
+      session.lastActivity = Date.now();
     }
   });
 }
 
-function handleDisconnect(socketId, sessionId) {
+function handleDisconnect(socketId) {
+  const sessionId = playerSessions[socketId];
+  if (!sessionId) return;
+
   const session = sessions[sessionId];
   if (!session) return;
 
   removePlayer(session.gameState, socketId);
   delete session.players[socketId];
+  delete playerSessions[socketId];
 
   if (Object.keys(session.players).length === 0) {
     if (session.gameLoopStop) {
@@ -79,10 +95,28 @@ function handleDisconnect(socketId, sessionId) {
     }
     delete sessions[sessionId];
   } else if (session.host === socketId) {
-    // If the host disconnected, assign a new host
     session.host = Object.keys(session.players)[0];
     session.gameState.host = session.host;
+    session.io.to(sessionId).emit("newHost", session.host);
   }
+
+  session.lastActivity = Date.now();
+}
+
+function cleanupStaleSessions() {
+  const now = Date.now();
+  Object.keys(sessions).forEach((sessionId) => {
+    const session = sessions[sessionId];
+    if (now - session.lastActivity > SESSION_CLEANUP_INTERVAL) {
+      if (session.gameLoopStop) {
+        session.gameLoopStop();
+      }
+      Object.keys(session.players).forEach((playerId) => {
+        delete playerSessions[playerId];
+      });
+      delete sessions[sessionId];
+    }
+  });
 }
 
 function clearSessions() {
@@ -93,10 +127,29 @@ function clearSessions() {
     }
     delete sessions[key];
   });
+  Object.keys(playerSessions).forEach((key) => {
+    delete playerSessions[key];
+  });
 }
 
 function getSession(sessionId) {
   return sessions[sessionId];
 }
 
-module.exports = { findOrCreateSession, clearSessions, getSession };
+function getAllSessions() {
+  return sessions;
+}
+
+function getAllPlayerSessions() {
+  return playerSessions;
+}
+
+setInterval(cleanupStaleSessions, SESSION_CLEANUP_INTERVAL);
+
+module.exports = {
+  findOrCreateSession,
+  clearSessions,
+  getSession,
+  getAllSessions,
+  getAllPlayerSessions,
+};

@@ -15,4 +15,6 @@ module.exports = {
   BOSS_HEALTH: 1000,
   MAX_POWERUPS: 3,
   POWERUP_LIFETIME: 5000,
+  INPUT_THROTTLE: 16, // ms, adjust as needed
+  MAX_QUEUED_INPUTS: 3, // Limit queued inputs
 };

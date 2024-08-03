@@ -15,8 +15,10 @@ function createServer() {
   io.on("connection", (socket) => {
     findOrCreateSession(socket, io);
 
-    socket.on("ping", () => {
-      socket.emit("pong");
+    socket.on("ping", (callback) => {
+      if (typeof callback === "function") {
+        callback();
+      }
     });
   });
 
