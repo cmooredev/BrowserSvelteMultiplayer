@@ -21,7 +21,7 @@ function addEnemy(gameState, id) {
 
 function spawnEnemyWave(gameState) {
   gameState.waveNumber++;
-  const enemyCount = gameState.waveNumber * 2;
+  const enemyCount = gameState.waveNumber * 2 + 1000;
   for (let i = 0; i < enemyCount; i++) {
     addEnemy(gameState, `enemy_${Date.now()}_${i}`);
   }

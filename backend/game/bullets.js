@@ -39,7 +39,11 @@ function createRadialBlast(gameState, player) {
       y: player.y + PLAYER_SIZE / 2,
       dx: Math.cos(angle) * BULLET_SPEED,
       dy: Math.sin(angle) * BULLET_SPEED,
-      playerId: player.id,
+      playerId:
+        player.id ||
+        Object.keys(gameState.players).find(
+          (id) => gameState.players[id] === player
+        ),
     };
     gameState.changes.bullets[bulletId] = gameState.bullets[bulletId];
   }

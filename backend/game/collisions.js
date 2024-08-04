@@ -23,12 +23,7 @@ function checkBulletCollisions(gameState) {
     let bullet = gameState.bullets[bulletId];
     for (let enemyId in gameState.enemies) {
       let enemy = gameState.enemies[enemyId];
-      if (
-        bullet.x < enemy.x + PLAYER_SIZE &&
-        bullet.x + BULLET_SIZE > enemy.x &&
-        bullet.y < enemy.y + PLAYER_SIZE &&
-        bullet.y + BULLET_SIZE > enemy.y
-      ) {
+      if (isColliding(bullet, enemy, PLAYER_SIZE, BULLET_SIZE)) {
         delete gameState.enemies[enemyId];
         delete gameState.bullets[bulletId];
         gameState.changes.enemies[enemyId] = null;
@@ -42,6 +37,7 @@ function checkBulletCollisions(gameState) {
       }
     }
   }
+
   if (gameState.boss) {
     for (let bulletId in gameState.bullets) {
       let bullet = gameState.bullets[bulletId];

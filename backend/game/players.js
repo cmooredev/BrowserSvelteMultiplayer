@@ -47,7 +47,7 @@ function handlePlayerInput(gameState, id, input) {
 
   if (input === "shoot") {
     if (player.radialBlast) {
-      createRadialBlast(gameState, player);
+      createRadialBlast(gameState, { ...player, id });
     } else {
       addBullet(gameState, id);
     }

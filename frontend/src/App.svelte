@@ -32,7 +32,6 @@
   function updatePing() {
     const start = Date.now();
     socket.emit("ping", () => {
-      console.log("ping");
       ping = Date.now() - start;
     });
   }
@@ -123,14 +122,13 @@
         console.log(
           `Connected to session ${sessionId} as socket ${socketId}. Is host: ${isHost}. session.host: ${sessionHost}`
         );
-        console.log("players", players);
         clearGameState();
         isGameStarted = false;
 
         socket.on("newHost", (host) => {
-          console.log("Host left. You are now the host.")
+          console.log("Host left. You are now the host.");
           hostSocketId = host;
-        })
+        });
 
         socket.on("gameStateUpdate", (changes) => {
           updatePlayers(changes.players);
@@ -155,7 +153,6 @@
         });
 
         socket.on("gameStarted", () => {
-          console.log("gameStarted");
           clearGameState();
           isGameStarted = true;
           isGameOver = false;

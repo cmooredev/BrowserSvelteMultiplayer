@@ -2,7 +2,6 @@ const { startGameLoop } = require("./gameLoop");
 const { createGameState, startGame, resetGame } = require("./gameState");
 const { addPlayer, removePlayer, handlePlayerInput } = require("./players");
 const { v4: uuidv4 } = require("uuid");
-const { PLAYER_SPEED, BULLET_COOLDOWN } = require("./constants");
 
 const sessions = {};
 const playerSessions = {};
@@ -15,7 +14,7 @@ function findOrCreateSession(socket, io) {
   let sessionId = Object.keys(sessions).find(
     (id) =>
       !sessions[id].gameState.isGameStarted &&
-      Object.keys(sessions[id].players).length < 2
+      Object.keys(sessions[id].players).length < 1
   );
 
   if (!sessionId) {
@@ -96,11 +95,9 @@ function handleDisconnect(io, socketId) {
     }
     delete sessions[sessionId];
   } else if (session.host === socketId) {
-    console.log("Player was host. Finding new host...");
     session.host = Object.keys(session.players)[0];
     session.gameState.host = session.host;
     io.to(sessionId).emit("newHost", session.host);
-    console.log("Emitting new host id", session.host);
   }
 
   session.lastActivity = Date.now();
@@ -126,7 +123,6 @@ function clearSessions() {
   Object.keys(sessions).forEach((key) => {
     if (sessions[key].gameLoopStop) {
       sessions[key].gameLoopStop();
-      console.log("Cleared session", key);
     }
     delete sessions[key];
   });
